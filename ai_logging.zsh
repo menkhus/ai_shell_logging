@@ -6,14 +6,50 @@
 AI_LOG_DIR="${AI_LOG_DIR:-$HOME/ai_shell_logs}"
 
 # Generic wrapper - logs to app-specific subdir
+# Supports --tag "description" to tag the session
 _logged_ai() {
     local app="$1"
     shift
+
+    # Parse --tag argument (must come before app args)
+    local tag=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --tag)
+                tag="$2"
+                shift 2
+                ;;
+            --tag=*)
+                tag="${1#--tag=}"
+                shift
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
     local logdir="$AI_LOG_DIR/$app"
     mkdir -p "$logdir"
-    local logfile="$logdir/$(date +%F_%H%M%S).log"
+    local timestamp=$(date +%F_%H%M%S)
+    local logfile="$logdir/${timestamp}.log"
+    local metafile="$logdir/${timestamp}.meta"
 
-    echo "Logging to: $logfile"
+    # Write metadata file
+    {
+        echo "{"
+        echo "  \"app\": \"$app\","
+        echo "  \"timestamp\": \"$(date -Iseconds)\","
+        echo "  \"tag\": \"$tag\","
+        echo "  \"logfile\": \"$logfile\""
+        echo "}"
+    } > "$metafile"
+
+    if [[ -n "$tag" ]]; then
+        echo "Logging to: $logfile (tag: $tag)"
+    else
+        echo "Logging to: $logfile"
+    fi
     script -q "$logfile" command "$app" "$@"
 }
 
@@ -115,4 +151,79 @@ ai_clean() {
 ai_export() {
     local script_dir="${0:A:h}"
     python3 "$script_dir/ai_export.py" "$@"
+}
+
+# List sessions by tag or show all tags
+# Usage: ai_tags              # List all unique tags
+#        ai_tags <pattern>    # Find sessions matching tag pattern
+ai_tags() {
+    local pattern="${1:-}"
+
+    if [[ -z "$pattern" ]]; then
+        # List all unique tags
+        echo "Tags:"
+        find "$AI_LOG_DIR" -name "*.meta" -type f -exec cat {} \; 2>/dev/null |
+            grep '"tag":' |
+            sed 's/.*"tag": "\([^"]*\)".*/\1/' |
+            grep -v '^$' |
+            sort -u |
+            while read -r tag; do
+                local count=$(find "$AI_LOG_DIR" -name "*.meta" -exec grep -l "\"tag\": \"$tag\"" {} \; 2>/dev/null | wc -l | tr -d ' ')
+                echo "  $tag ($count sessions)"
+            done
+    else
+        # Find sessions matching tag pattern
+        echo "Sessions tagged with '$pattern':"
+        find "$AI_LOG_DIR" -name "*.meta" -type f -print0 2>/dev/null |
+            while IFS= read -r -d '' metafile; do
+                if grep -q "\"tag\": \".*$pattern.*\"" "$metafile" 2>/dev/null; then
+                    local logfile="${metafile%.meta}.log"
+                    local tag=$(grep '"tag":' "$metafile" | sed 's/.*"tag": "\([^"]*\)".*/\1/')
+                    local ts=$(grep '"timestamp":' "$metafile" | sed 's/.*"timestamp": "\([^"]*\)".*/\1/')
+                    echo "  $logfile"
+                    echo "    Tag: $tag | Time: $ts"
+                fi
+            done
+    fi
+}
+
+# Tag an existing log file retroactively
+# Usage: ai_tag <logfile> <tag>
+ai_tag() {
+    local logfile="$1"
+    local tag="$2"
+
+    if [[ -z "$logfile" || -z "$tag" ]]; then
+        echo "Usage: ai_tag <logfile> <tag>"
+        echo "Add or update tag for an existing log file"
+        return 1
+    fi
+
+    if [[ ! -f "$logfile" ]]; then
+        echo "Error: Log file not found: $logfile"
+        return 1
+    fi
+
+    local metafile="${logfile%.log}.meta"
+    local app=$(basename "$(dirname "$logfile")")
+
+    if [[ -f "$metafile" ]]; then
+        # Update existing meta file - replace tag line
+        local tmp=$(mktemp)
+        sed "s/\"tag\": \"[^\"]*\"/\"tag\": \"$tag\"/" "$metafile" > "$tmp"
+        mv "$tmp" "$metafile"
+        echo "Updated tag to: $tag"
+    else
+        # Create new meta file
+        local ts=$(stat -f "%Sm" -t "%Y-%m-%dT%H:%M:%S" "$logfile" 2>/dev/null || date -Iseconds)
+        {
+            echo "{"
+            echo "  \"app\": \"$app\","
+            echo "  \"timestamp\": \"$ts\","
+            echo "  \"tag\": \"$tag\","
+            echo "  \"logfile\": \"$logfile\""
+            echo "}"
+        } > "$metafile"
+        echo "Created tag: $tag"
+    fi
 }

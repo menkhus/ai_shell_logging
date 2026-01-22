@@ -28,6 +28,7 @@ Wrapper functions that log only specific AI tools to application-specific direct
 ~/ai_shell_logs/
 ├── claude/
 │   ├── 2026-01-22_143052.log
+│   ├── 2026-01-22_143052.meta   # JSON metadata with tag
 │   └── 2026-01-22_091523.log
 ├── ollama/
 │   └── 2026-01-22_102211.log
@@ -53,6 +54,18 @@ vim foo.py          # Normal vim, not logged
 ai_logs             # List all recent logs
 ai_logs claude      # List recent claude logs
 ai_tail claude      # Tail the most recent claude session (from another terminal)
+
+# Tag a session when starting
+claude --tag "refactoring auth"
+
+# Tag an existing log retroactively
+ai_tag ~/ai_shell_logs/claude/2026-01-22_143052.log "bug fix"
+
+# List all tags
+ai_tags
+
+# Find sessions by tag pattern
+ai_tags "auth"
 ```
 
 ## Post-Processing
@@ -92,5 +105,4 @@ Each wrapped command gets its own subdirectory under `~/ai_shell_logs/`.
 
 - Search across logs (`ai_search "some idea"`)
 - Log rotation / cleanup for old logs
-- Session tagging (`claude --tag "refactoring auth"`)
 - Integration with context-planner (auto-capture before `/pivot`)

@@ -55,6 +55,32 @@ ai_logs claude      # List recent claude logs
 ai_tail claude      # Tail the most recent claude session (from another terminal)
 ```
 
+## Post-Processing
+
+Raw logs contain ANSI escape codes. Use these tools to make them readable:
+
+```bash
+# Strip ANSI codes for readable text
+ai_clean ~/ai_shell_logs/claude/2026-01-22_143052.log
+
+# Export to clean text using terminal emulation (best results)
+ai_export ~/ai_shell_logs/claude/2026-01-22_143052.log
+
+# Export to structured JSON
+ai_export ~/ai_shell_logs/claude/2026-01-22_143052.log --json
+
+# Save to file
+ai_export ~/ai_shell_logs/claude/2026-01-22_143052.log --json -o session.json
+```
+
+### Requirements
+
+`ai_export` requires the `pyte` library:
+
+```bash
+pip install pyte
+```
+
 ## How It Works
 
 Uses the classic Unix `script` command to record terminal sessions:
@@ -64,7 +90,7 @@ Each wrapped command gets its own subdirectory under `~/ai_shell_logs/`.
 
 ## Future Ideas
 
+- Search across logs (`ai_search "some idea"`)
 - Log rotation / cleanup for old logs
-- Search across logs (`ai_grep "some idea"`)
 - Session tagging (`claude --tag "refactoring auth"`)
 - Integration with context-planner (auto-capture before `/pivot`)

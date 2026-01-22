@@ -14,7 +14,7 @@ _logged_ai() {
     local logfile="$logdir/$(date +%F_%H%M%S).log"
 
     echo "Logging to: $logfile"
-    script -q -f "$logfile" command "$app" "$@"
+    script -q "$logfile" command "$app" "$@"
 }
 
 # Opt-in wrappers - only these get logged

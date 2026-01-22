@@ -59,7 +59,6 @@ ai_tail claude      # Tail the most recent claude session (from another terminal
 
 Uses the classic Unix `script` command to record terminal sessions:
 - `-q` - quiet mode, no "Script started" banner
-- `-f` - flush in real time (survives crashes)
 
 Each wrapped command gets its own subdirectory under `~/ai_shell_logs/`.
 

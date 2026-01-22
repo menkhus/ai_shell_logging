@@ -86,6 +86,47 @@ ai_export ~/ai_shell_logs/claude/2026-01-22_143052.log --json
 ai_export ~/ai_shell_logs/claude/2026-01-22_143052.log --json -o session.json
 ```
 
+### JSON Schema
+
+The `--json` output provides structured access to conversation data:
+
+```json
+{
+  "metadata": {
+    "exported_at": "2026-01-22T14:25:42.203664",
+    "format_version": "1.0",
+    "source_file": "/Users/mark/ai_shell_logs/claude/2026-01-22_140505.log"
+  },
+  "messages": [
+    {"role": "user", "content": "Your prompt here..."},
+    {"role": "assistant", "content": "Claude's response..."}
+  ],
+  "raw_text": "Full rendered terminal output..."
+}
+```
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `metadata.exported_at` | string | ISO timestamp of export |
+| `metadata.format_version` | string | Schema version for compatibility |
+| `metadata.source_file` | string | Path to original log file |
+| `messages[]` | array | Parsed conversation turns |
+| `messages[].role` | string | `"user"` or `"assistant"` |
+| `messages[].content` | string | Message content |
+| `raw_text` | string | Complete rendered terminal output |
+
+Example: Extract all user prompts from a session:
+
+```bash
+ai_export session.log --json | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+for msg in data['messages']:
+    if msg['role'] == 'user':
+        print(msg['content'])
+"
+```
+
 ### Requirements
 
 `ai_export` requires the `pyte` library:
@@ -93,6 +134,30 @@ ai_export ~/ai_shell_logs/claude/2026-01-22_143052.log --json -o session.json
 ```bash
 pip install pyte
 ```
+
+## Architecture
+
+This directory (`~/src/ai_shell_logging`) contains the integration tools. Your `~/.zshrc` sources the main script:
+
+```
+~/.zshrc
+    └── source ~/src/ai_shell_logging/ai_logging.zsh
+            │
+            ├── Wrapper functions (claude, ollama, gemini)
+            │       └── Intercept commands, log via `script`
+            │
+            ├── Log management (ai_logs, ai_tail, ai_session)
+            │
+            ├── Tagging (ai_tag, ai_tags)
+            │
+            └── Post-processing (ai_clean, ai_export)
+                    └── ai_export.py (pyte terminal emulation)
+```
+
+Data flows:
+1. You run `claude` → wrapper logs to `~/ai_shell_logs/claude/<timestamp>.log`
+2. Metadata written to `<timestamp>.meta` (JSON with tag, timestamp)
+3. Later: `ai_export` converts raw logs to readable text or structured JSON
 
 ## How It Works
 

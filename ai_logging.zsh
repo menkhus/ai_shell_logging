@@ -7,6 +7,7 @@ AI_LOG_DIR="${AI_LOG_DIR:-$HOME/ai_shell_logs}"
 
 # Generic wrapper - logs to app-specific subdir
 # Supports --tag "description" to tag the session
+# Automatically post-processes logs after session ends
 _logged_ai() {
     local app="$1"
     shift
@@ -34,6 +35,9 @@ _logged_ai() {
     local timestamp=$(date +%F_%H%M%S)
     local logfile="$logdir/${timestamp}.log"
     local metafile="$logdir/${timestamp}.meta"
+    local cleanfile="$logdir/${timestamp}.txt"
+    local jsonfile="$logdir/${timestamp}.json"
+    local errorfile="$logdir/${timestamp}.error"
 
     # Write metadata file
     {
@@ -41,7 +45,7 @@ _logged_ai() {
         echo "  \"app\": \"$app\","
         echo "  \"timestamp\": \"$(date -Iseconds)\","
         echo "  \"tag\": \"$tag\","
-        echo "  \"logfile\": \"$logfile\""
+        echo "  \"logfile\": \"$cleanfile\""
         echo "}"
     } > "$metafile"
 
@@ -50,7 +54,84 @@ _logged_ai() {
     else
         echo "Logging to: $logfile"
     fi
+
+    # Run the session
     script -q "$logfile" command "$app" "$@"
+
+    # Post-process the log automatically
+    echo "Post-processing log..."
+    _postprocess_log "$logfile" "$cleanfile" "$jsonfile" "$errorfile"
+}
+
+# Post-process a raw log file into clean text and JSON
+# On success: creates .txt and .json, deletes raw .log
+# On failure: writes .error file, keeps raw .log
+_postprocess_log() {
+    local logfile="$1"
+    local cleanfile="$2"
+    local jsonfile="$3"
+    local errorfile="$4"
+    local script_dir="${0:A:h}"
+
+    # Try to export clean text
+    local export_output
+    if export_output=$(python3 "$script_dir/ai_export.py" "$logfile" 2>&1); then
+        echo "$export_output" > "$cleanfile"
+    else
+        _log_postprocess_error "$logfile" "$errorfile" "text export" "$export_output"
+        return 1
+    fi
+
+    # Try to export JSON
+    if export_output=$(python3 "$script_dir/ai_export.py" "$logfile" --json 2>&1); then
+        echo "$export_output" > "$jsonfile"
+    else
+        _log_postprocess_error "$logfile" "$errorfile" "JSON export" "$export_output"
+        return 1
+    fi
+
+    # Success - remove raw log file
+    rm -f "$logfile"
+    echo "Log processed: $cleanfile"
+}
+
+# Log a post-processing error
+_log_postprocess_error() {
+    local logfile="$1"
+    local errorfile="$2"
+    local stage="$3"
+    local error_output="$4"
+    local script_dir="${0:A:h}"
+
+    # Write detailed error to file
+    {
+        echo "Post-processing error"
+        echo "====================="
+        echo "Timestamp: $(date -Iseconds)"
+        echo "Stage: $stage"
+        echo "Log file: $logfile"
+        echo "Script: $script_dir/ai_export.py"
+        echo ""
+        echo "Error output:"
+        echo "$error_output"
+    } > "$errorfile"
+
+    # Notify user on stdout
+    echo ""
+    echo "=========================================="
+    echo "POST-LOG PROCESSING ERROR"
+    echo "=========================================="
+    echo "AI session logging completed successfully."
+    echo "However, automatic post-processing failed."
+    echo ""
+    echo "Stage:     $stage"
+    echo "Raw log:   $logfile (preserved)"
+    echo "Error log: $errorfile"
+    echo "Code:      $script_dir/ai_export.py"
+    echo ""
+    echo "You can manually process with:"
+    echo "  ai_export $logfile"
+    echo "=========================================="
 }
 
 # Opt-in wrappers - only these get logged

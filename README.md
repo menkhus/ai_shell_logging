@@ -27,14 +27,22 @@ Wrapper functions that log only specific AI tools to application-specific direct
 ```
 ~/ai_shell_logs/
 ├── claude/
-│   ├── 2026-01-22_143052.log
-│   ├── 2026-01-22_143052.meta   # JSON metadata with tag
-│   └── 2026-01-22_091523.log
+│   ├── 2026-01-22_143052.txt    # Clean readable text (auto-generated)
+│   ├── 2026-01-22_143052.json   # Structured JSON (auto-generated)
+│   ├── 2026-01-22_143052.meta   # Session metadata with tag
+│   └── 2026-01-22_091523.txt
 ├── ollama/
-│   └── 2026-01-22_102211.log
+│   └── 2026-01-22_102211.txt
 └── gemini/
-    └── 2026-01-22_111847.log
+    └── 2026-01-22_111847.txt
 ```
+
+After each session, logs are automatically post-processed:
+- `.txt` - Clean, readable terminal output
+- `.json` - Structured conversation data
+- `.meta` - Session metadata (tag, timestamp)
+- `.log` - Raw log (deleted after successful processing)
+- `.error` - Error details (only if processing failed)
 
 ## Installation
 
@@ -157,7 +165,9 @@ This directory (`~/src/ai_shell_logging`) contains the integration tools. Your `
 Data flows:
 1. You run `claude` → wrapper logs to `~/ai_shell_logs/claude/<timestamp>.log`
 2. Metadata written to `<timestamp>.meta` (JSON with tag, timestamp)
-3. Later: `ai_export` converts raw logs to readable text or structured JSON
+3. Session ends → automatic post-processing runs
+4. On success: creates `.txt` + `.json`, deletes raw `.log`
+5. On failure: writes `.error` file, preserves raw `.log`, notifies user
 
 ## How It Works
 

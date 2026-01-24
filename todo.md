@@ -128,11 +128,11 @@
 #### Validation First (Days 1-3)
 
 - [ ] **Instrument prompt clinic** - Log before/after prompt state with session ID
-- [ ] **Create capture schema** - Define metrics for before/after comparison
-- [ ] **Manual sprint: native mode** - Full capture, no intervention
-- [ ] **Manual sprint: focused mode** - Full capture, microsprint discipline
-- [ ] **Compare metrics** - Which numbers moved?
-- [ ] **Document anecdotes** - What felt different?
+- [x] **Create capture schema** - Define metrics for before/after comparison (capture_schema.py)
+- [x] **Manual sprint: native mode** - Full capture, no intervention (sprint_runner.py)
+- [x] **Manual sprint: focused mode** - Full capture, microsprint discipline (sprint_runner.py with heuristic scoring)
+- [x] **Compare metrics** - Which numbers moved? (metrics_compare.py)
+- [x] **Document anecdotes** - What felt different? (anecdotes.py)
 
 #### Build Phase (Day 4+, if validated)
 

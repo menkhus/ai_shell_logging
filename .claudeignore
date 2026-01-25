@@ -1,0 +1,3 @@
+# Historical planning docs - completed work, stale context
+# These will confuse LLMs reading the codebase
+docs/archive/

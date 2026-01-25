@@ -59,11 +59,18 @@ class SessionMeta:
     model: Optional[str] = None
     tag: Optional[str] = None
     cwd: Optional[str] = None
+    # Enhanced breadcrumb fields
+    duration: Optional[str] = None
+    gitBranch: Optional[str] = None
+    gitCommitBefore: Optional[str] = None
+    gitCommitAfter: Optional[str] = None
+    gitCommitsMade: Optional[str] = None
+    filesModified: Optional[str] = None
 
     def to_dict(self) -> dict:
         d = asdict(self)
-        # Remove None values for cleaner output
-        return {k: v for k, v in d.items() if v is not None}
+        # Remove None and empty string values for cleaner output
+        return {k: v for k, v in d.items() if v is not None and v != ""}
 
 
 @dataclass
@@ -88,10 +95,12 @@ class SessionConverter:
     - Deterministic UUID generation (session and message IDs)
     - Parent chain threading (each message links to its predecessor)
     - JSONL output with session metadata header
+    - Enhanced breadcrumb metadata (git, timing, files)
     """
 
     def __init__(self, app: str, source_file: Path, start_time: datetime,
-                 model: str = None, tag: str = None, cwd: str = None):
+                 model: str = None, tag: str = None, cwd: str = None,
+                 meta: dict = None):
         """
         Initialize converter for a session.
 
@@ -102,6 +111,7 @@ class SessionConverter:
             model: Optional model name (llama3, gemini-pro, etc.)
             tag: Optional session tag/description
             cwd: Optional working directory
+            meta: Optional full metadata dict from .meta file
         """
         self.app = app
         self.source_file = source_file
@@ -109,6 +119,7 @@ class SessionConverter:
         self.model = model
         self.tag = tag
         self.cwd = cwd
+        self.meta = meta or {}
 
         # Generate deterministic session ID
         self.session_id = generate_session_id(app, source_file.name, start_time)
@@ -166,20 +177,30 @@ class SessionConverter:
         return record
 
     def get_session_meta(self) -> SessionMeta:
-        """Generate session metadata record."""
+        """Generate session metadata record with enhanced breadcrumb fields."""
         created = self.messages[0].timestamp if self.messages else self.start_time.isoformat() + "Z"
         modified = self.messages[-1].timestamp if self.messages else created
+
+        # Use metadata from .meta file if available
+        meta = self.meta
 
         return SessionMeta(
             sessionId=self.session_id,
             app=self.app,
             sourceFile=str(self.source_file),
-            created=created,
-            modified=modified,
+            created=meta.get("startTime", created),
+            modified=meta.get("endTime", modified),
             messageCount=len(self.messages),
             model=self.model,
-            tag=self.tag,
-            cwd=self.cwd
+            tag=self.tag or meta.get("tag"),
+            cwd=self.cwd or meta.get("cwd"),
+            # Enhanced breadcrumb fields
+            duration=meta.get("duration"),
+            gitBranch=meta.get("gitBranch"),
+            gitCommitBefore=meta.get("gitCommitBefore"),
+            gitCommitAfter=meta.get("gitCommitAfter"),
+            gitCommitsMade=meta.get("gitCommitsMade"),
+            filesModified=meta.get("filesModified")
         )
 
     def to_jsonl(self) -> str:

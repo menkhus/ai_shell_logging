@@ -10,6 +10,7 @@ AI_LOG_DIR="${AI_LOG_DIR:-$HOME/ai_shell_logs}"
 # Generic wrapper - logs to app-specific subdir
 # Supports --tag "description" to tag the session
 # Automatically post-processes logs after session ends
+# Captures rich context: cwd, git state, timing, files modified
 _logged_ai() {
     local app="$1"
     shift
@@ -41,11 +42,28 @@ _logged_ai() {
     local jsonfile="$logdir/${timestamp}.json"
     local errorfile="$logdir/${timestamp}.error"
 
-    # Write metadata file
+    # Capture session context
+    local cwd="$PWD"
+    local start_time=$(date -Iseconds)
+    local git_branch=""
+    local git_commit_before=""
+    local in_git_repo="false"
+
+    # Capture git context if in a repo
+    if git rev-parse --git-dir &>/dev/null 2>&1; then
+        in_git_repo="true"
+        git_branch=$(git branch --show-current 2>/dev/null || echo "")
+        git_commit_before=$(git rev-parse HEAD 2>/dev/null || echo "")
+    fi
+
+    # Write initial metadata file (will be updated after session)
     {
         echo "{"
         echo "  \"app\": \"$app\","
-        echo "  \"timestamp\": \"$(date -Iseconds)\","
+        echo "  \"startTime\": \"$start_time\","
+        echo "  \"cwd\": \"$cwd\","
+        echo "  \"gitBranch\": \"$git_branch\","
+        echo "  \"gitCommitBefore\": \"$git_commit_before\","
         echo "  \"tag\": \"$tag\","
         echo "  \"logfile\": \"$cleanfile\""
         echo "}"
@@ -56,13 +74,63 @@ _logged_ai() {
     else
         echo "Logging to: $logfile"
     fi
+    [[ -n "$git_branch" ]] && echo "Git branch: $git_branch"
 
     # Run the session
     script -q "$logfile" command "$app" "$@"
 
+    # Capture end state
+    local end_time=$(date -Iseconds)
+    local git_commit_after=""
+    local git_commits_made=""
+    local files_modified=""
+
+    if [[ "$in_git_repo" == "true" && -n "$git_commit_before" ]]; then
+        git_commit_after=$(git rev-parse HEAD 2>/dev/null || echo "")
+        if [[ "$git_commit_before" != "$git_commit_after" ]]; then
+            git_commits_made=$(git log --oneline "$git_commit_before".."$git_commit_after" 2>/dev/null | head -10)
+            files_modified=$(git diff --name-only "$git_commit_before" 2>/dev/null | head -20 | tr '\n' ',' | sed 's/,$//')
+        fi
+    fi
+
+    # Calculate duration
+    local start_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S" "${start_time%+*}" "+%s" 2>/dev/null || echo "0")
+    local end_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S" "${end_time%+*}" "+%s" 2>/dev/null || echo "0")
+    local duration_secs=$((end_epoch - start_epoch))
+    local duration_fmt="${duration_secs}s"
+    if [[ $duration_secs -ge 60 ]]; then
+        local mins=$((duration_secs / 60))
+        local secs=$((duration_secs % 60))
+        duration_fmt="${mins}m${secs}s"
+    fi
+
+    # Write complete metadata file
+    {
+        echo "{"
+        echo "  \"app\": \"$app\","
+        echo "  \"startTime\": \"$start_time\","
+        echo "  \"endTime\": \"$end_time\","
+        echo "  \"duration\": \"$duration_fmt\","
+        echo "  \"cwd\": \"$cwd\","
+        echo "  \"gitBranch\": \"$git_branch\","
+        echo "  \"gitCommitBefore\": \"$git_commit_before\","
+        echo "  \"gitCommitAfter\": \"$git_commit_after\","
+        echo "  \"gitCommitsMade\": \"$git_commits_made\","
+        echo "  \"filesModified\": \"$files_modified\","
+        echo "  \"tag\": \"$tag\","
+        echo "  \"logfile\": \"$cleanfile\""
+        echo "}"
+    } > "$metafile"
+
+    # Show session summary
+    echo ""
+    echo "Session ended ($duration_fmt)"
+    [[ -n "$git_commits_made" ]] && echo "Commits made:" && echo "$git_commits_made" | sed 's/^/  /'
+    [[ -n "$files_modified" ]] && echo "Files modified: $files_modified"
+
     # Post-process the log automatically
     echo "Post-processing log..."
-    _postprocess_log "$logfile" "$cleanfile" "$jsonfile" "$errorfile"
+    _postprocess_log "$logfile" "$cleanfile" "$jsonfile" "$errorfile" "$metafile"
 }
 
 # Post-process a raw log file into clean text and JSONL
@@ -73,6 +141,7 @@ _postprocess_log() {
     local cleanfile="$2"
     local jsonfile="$3"  # Unused in new format, kept for backward compat
     local errorfile="$4"
+    local metafile="$5"
     local script_dir="${0:A:h}"
 
     # Try to export clean text
@@ -84,8 +153,14 @@ _postprocess_log() {
         return 1
     fi
 
+    # Build metadata args for JSONL export
+    local meta_args=""
+    if [[ -f "$metafile" ]]; then
+        meta_args="--meta $metafile"
+    fi
+
     # Try to export JSONL (new Claude-compatible format)
-    if export_output=$(python3 "$script_dir/ai_export.py" "$logfile" --jsonl --index 2>&1); then
+    if export_output=$(python3 "$script_dir/ai_export.py" "$logfile" --jsonl --index $meta_args 2>&1); then
         # Output goes to sessions/{session_id}.jsonl and index is updated
         echo "$export_output"
     else

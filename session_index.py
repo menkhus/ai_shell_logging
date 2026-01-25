@@ -45,12 +45,16 @@ class SessionEntry:
     model: Optional[str] = None
     tag: Optional[str] = None
     cwd: Optional[str] = None
+    # Enhanced breadcrumb fields
+    duration: Optional[str] = None
     gitBranch: Optional[str] = None
+    gitCommits: Optional[str] = None
+    filesModified: Optional[str] = None
 
     def to_dict(self) -> dict:
         d = asdict(self)
-        # Remove None values
-        return {k: v for k, v in d.items() if v is not None}
+        # Remove None and empty string values
+        return {k: v for k, v in d.items() if v is not None and v != ""}
 
     @classmethod
     def from_dict(cls, data: dict) -> 'SessionEntry':
@@ -65,7 +69,10 @@ class SessionEntry:
             model=data.get("model"),
             tag=data.get("tag"),
             cwd=data.get("cwd"),
-            gitBranch=data.get("gitBranch")
+            duration=data.get("duration"),
+            gitBranch=data.get("gitBranch"),
+            gitCommits=data.get("gitCommits"),
+            filesModified=data.get("filesModified")
         )
 
 
@@ -158,6 +165,9 @@ class SessionIndex:
                     message_count: int, model: str = None,
                     tag: str = None, cwd: str = None,
                     git_branch: str = None,
+                    duration: str = None,
+                    git_commits: str = None,
+                    files_modified: str = None,
                     created: datetime = None,
                     modified: datetime = None):
         """
@@ -181,7 +191,10 @@ class SessionIndex:
             model=model,
             tag=tag,
             cwd=cwd,
-            gitBranch=git_branch
+            duration=duration,
+            gitBranch=git_branch,
+            gitCommits=git_commits,
+            filesModified=files_modified
         )
 
         # Update existing or append
@@ -322,6 +335,58 @@ class SessionIndex:
 # CLI
 # =============================================================================
 
+def format_entry(e: SessionEntry, verbose: bool = False) -> str:
+    """Format a session entry for display."""
+    # Date from created timestamp
+    date = e.created[:10] if e.created else "unknown"
+
+    # Duration or message count
+    duration = e.duration or f"{e.messageCount}msg"
+
+    # Branch info
+    branch = e.gitBranch or ""
+
+    # Tag
+    tag = f"[{e.tag}]" if e.tag else ""
+
+    # First line: date, duration, branch, tag
+    parts = [date, duration]
+    if branch:
+        parts.append(branch)
+    if tag:
+        parts.append(tag)
+
+    header = "  ".join(parts)
+
+    # Prompt preview
+    prompt = e.firstPrompt[:60] + "..." if len(e.firstPrompt) > 60 else e.firstPrompt
+
+    lines = [f"{header}", f"  \"{prompt}\""]
+
+    if verbose:
+        if e.gitCommits:
+            lines.append(f"  → commits: {e.gitCommits[:60]}...")
+        if e.filesModified:
+            lines.append(f"  → files: {e.filesModified[:60]}")
+        if e.cwd:
+            lines.append(f"  → cwd: {e.cwd}")
+    else:
+        # Brief summary
+        extras = []
+        if e.gitCommits:
+            commit_count = e.gitCommits.count('\n') + 1 if e.gitCommits else 0
+            if commit_count > 0:
+                extras.append(f"{commit_count} commit(s)")
+        if e.filesModified:
+            file_count = e.filesModified.count(',') + 1 if e.filesModified else 0
+            if file_count > 0:
+                extras.append(f"{file_count} file(s)")
+        if extras:
+            lines.append(f"  → {', '.join(extras)}")
+
+    return "\n".join(lines)
+
+
 def main():
     import argparse
 
@@ -333,6 +398,7 @@ def main():
     parser.add_argument("--rebuild", action="store_true", help="Rebuild from sessions/")
     parser.add_argument("--find-tag", type=str, help="Find by tag")
     parser.add_argument("--find-prompt", type=str, help="Find by prompt")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Show full details")
     args = parser.parse_args()
 
     index = SessionIndex(args.app)
@@ -351,19 +417,22 @@ def main():
     elif args.find_tag:
         entries = index.find_by_tag(args.find_tag)
         for e in entries:
-            print(f"{e.sessionId[:8]}  {e.tag}  {e.firstPrompt[:50]}...")
+            print(format_entry(e, args.verbose))
+            print()
     elif args.find_prompt:
         entries = index.find_by_prompt(args.find_prompt)
         for e in entries:
-            print(f"{e.sessionId[:8]}  {e.firstPrompt[:60]}...")
+            print(format_entry(e, args.verbose))
+            print()
     elif args.recent > 0:
         entries = index.recent(args.recent)
         for e in entries:
-            print(f"{e.modified[:10]}  {e.sessionId[:8]}  {e.firstPrompt[:50]}...")
+            print(format_entry(e, args.verbose))
+            print()
     elif args.list:
         for e in index.entries:
-            tag = f"[{e.tag}] " if e.tag else ""
-            print(f"{e.sessionId[:8]}  {tag}{e.firstPrompt[:50]}...")
+            print(format_entry(e, args.verbose))
+            print()
     else:
         parser.print_help()
 

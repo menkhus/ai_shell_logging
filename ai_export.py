@@ -179,7 +179,7 @@ def parse_messages(text: str) -> list:
 
 
 def convert_to_jsonl(logfile: Path, app: str = None, model: str = None,
-                     tag: str = None, cwd: str = None) -> SessionConverter:
+                     tag: str = None, cwd: str = None, meta: dict = None) -> SessionConverter:
     """
     Convert log file to Claude-compatible JSONL format.
 
@@ -189,12 +189,19 @@ def convert_to_jsonl(logfile: Path, app: str = None, model: str = None,
         model: Model name (optional)
         tag: Session tag (optional)
         cwd: Working directory (optional)
+        meta: Full metadata dict from .meta file (overrides other args)
 
     Returns:
         SessionConverter with messages loaded
     """
     if not HAS_SESSION_SUPPORT:
         raise ImportError("session_converter module required for JSONL output")
+
+    # Use metadata if provided
+    if meta:
+        app = meta.get("app", app)
+        tag = meta.get("tag", tag)
+        cwd = meta.get("cwd", cwd)
 
     # Auto-detect app from path
     if app is None:
@@ -210,14 +217,15 @@ def convert_to_jsonl(logfile: Path, app: str = None, model: str = None,
     rendered = render_log(logfile)
     messages = parse_messages(rendered)
 
-    # Create converter
+    # Create converter with enhanced metadata
     converter = SessionConverter(
         app=app,
         source_file=logfile,
         start_time=start_time,
         model=model,
         tag=tag,
-        cwd=cwd
+        cwd=cwd,
+        meta=meta  # Pass full metadata for enhanced fields
     )
 
     # Add messages
@@ -236,16 +244,17 @@ def export_jsonl(logfile: Path, output_path: Path = None,
         logfile: Source log file
         output_path: Destination path (auto-generated if not provided)
         update_index: Whether to update sessions-index.json
-        **kwargs: Additional args for convert_to_jsonl
+        **kwargs: Additional args for convert_to_jsonl (including meta dict)
 
     Returns:
         Path to the written JSONL file
     """
     converter = convert_to_jsonl(logfile, **kwargs)
+    meta = kwargs.get("meta", {})
 
     # Determine output path
     if output_path is None:
-        app = kwargs.get("app") or logfile.parent.name
+        app = meta.get("app") or kwargs.get("app") or logfile.parent.name
         if app in ["raw", "sessions", "legacy"]:
             app = logfile.parent.parent.name
 
@@ -257,7 +266,7 @@ def export_jsonl(logfile: Path, output_path: Path = None,
 
     # Update index if requested
     if update_index and HAS_SESSION_SUPPORT:
-        app = kwargs.get("app") or logfile.parent.name
+        app = meta.get("app") or kwargs.get("app") or logfile.parent.name
         if app in ["raw", "sessions", "legacy"]:
             app = logfile.parent.parent.name
 
@@ -269,8 +278,12 @@ def export_jsonl(logfile: Path, output_path: Path = None,
             first_prompt=converter.first_prompt,
             message_count=converter.message_count,
             model=kwargs.get("model"),
-            tag=kwargs.get("tag"),
-            cwd=kwargs.get("cwd")
+            tag=meta.get("tag") or kwargs.get("tag"),
+            cwd=meta.get("cwd") or kwargs.get("cwd"),
+            git_branch=meta.get("gitBranch"),
+            duration=meta.get("duration"),
+            git_commits=meta.get("gitCommitsMade"),
+            files_modified=meta.get("filesModified")
         )
 
     return output_path
@@ -303,6 +316,8 @@ Examples:
                         help='Model name for metadata')
     parser.add_argument('--tag', type=str,
                         help='Session tag/description')
+    parser.add_argument('--meta', type=Path,
+                        help='Path to .meta file with session metadata')
     parser.add_argument('--cols', type=int, default=120,
                         help='Terminal columns (default: 120)')
     parser.add_argument('--rows', type=int, default=50,
@@ -321,6 +336,15 @@ Examples:
             print("Make sure session_converter.py is in the same directory", file=sys.stderr)
             sys.exit(1)
 
+        # Load metadata file if provided
+        meta = None
+        if args.meta and args.meta.exists():
+            try:
+                with open(args.meta) as f:
+                    meta = json.load(f)
+            except (json.JSONDecodeError, IOError) as e:
+                print(f"Warning: Could not load metadata file: {e}", file=sys.stderr)
+
         try:
             output_path = export_jsonl(
                 args.logfile,
@@ -328,12 +352,13 @@ Examples:
                 update_index=args.index,
                 app=args.app,
                 model=args.model,
-                tag=args.tag
+                tag=args.tag,
+                meta=meta
             )
             print(f"Written to: {output_path}", file=sys.stderr)
 
             # Also print session info
-            converter = convert_to_jsonl(args.logfile, app=args.app)
+            converter = convert_to_jsonl(args.logfile, app=args.app, meta=meta)
             print(f"Session ID: {converter.session_id}", file=sys.stderr)
             print(f"Messages: {converter.message_count}", file=sys.stderr)
 

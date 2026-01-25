@@ -1,4 +1,7 @@
 #!/bin/bash
+# Copyright (c) 2026 Mark Menkhus <mark.menkhus@gmail.com>
+# SPDX-License-Identifier: MIT
+#
 # backup_logs.sh - Backup Claude Code and AI shell logs
 #
 # Protects your valuable session history from rotation/loss.

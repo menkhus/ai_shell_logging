@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Mark Menkhus <mark.menkhus@gmail.com>
+# SPDX-License-Identifier: MIT
 """
 anecdotes.py - Capture and analyze qualitative observations from validation sprints
 

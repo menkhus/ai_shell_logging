@@ -1,4 +1,7 @@
 #!/bin/bash
+# Copyright (c) 2026 Mark Menkhus <mark.menkhus@gmail.com>
+# SPDX-License-Identifier: MIT
+#
 # log_depth.sh - Assess forensic depth of Claude Code session logs
 #
 # Shows: date range, session count, per-project breakdown

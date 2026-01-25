@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Mark Menkhus <mark.menkhus@gmail.com>
+# SPDX-License-Identifier: MIT
 """
 extract_tool_calls.py - Extract tool calls from Claude Code session JSONL
 

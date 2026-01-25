@@ -1,4 +1,7 @@
 #!/bin/bash
+# Copyright (c) 2026 Mark Menkhus <mark.menkhus@gmail.com>
+# SPDX-License-Identifier: MIT
+#
 # launchd_user_jobs.sh - Show non-Apple launchd jobs (your stuff + third-party)
 #
 # Filters out com.apple.* to see what YOU and third-party apps have registered.

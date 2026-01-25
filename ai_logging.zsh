@@ -1,4 +1,6 @@
 # ai_logging.zsh - Opt-in AI session logging
+# Copyright (c) 2026 Mark Menkhus <mark.menkhus@gmail.com>
+# SPDX-License-Identifier: MIT
 #
 # Source this file in your ~/.zshrc:
 #   source ~/src/ai_shell_logging/ai_logging.zsh
@@ -63,13 +65,13 @@ _logged_ai() {
     _postprocess_log "$logfile" "$cleanfile" "$jsonfile" "$errorfile"
 }
 
-# Post-process a raw log file into clean text and JSON
-# On success: creates .txt and .json, deletes raw .log
+# Post-process a raw log file into clean text and JSONL
+# On success: creates .txt and sessions/{session_id}.jsonl, updates index, deletes raw .log
 # On failure: writes .error file, keeps raw .log
 _postprocess_log() {
     local logfile="$1"
     local cleanfile="$2"
-    local jsonfile="$3"
+    local jsonfile="$3"  # Unused in new format, kept for backward compat
     local errorfile="$4"
     local script_dir="${0:A:h}"
 
@@ -82,16 +84,20 @@ _postprocess_log() {
         return 1
     fi
 
-    # Try to export JSON
-    if export_output=$(python3 "$script_dir/ai_export.py" "$logfile" --json 2>&1); then
-        echo "$export_output" > "$jsonfile"
+    # Try to export JSONL (new Claude-compatible format)
+    if export_output=$(python3 "$script_dir/ai_export.py" "$logfile" --jsonl --index 2>&1); then
+        # Output goes to sessions/{session_id}.jsonl and index is updated
+        echo "$export_output"
     else
-        _log_postprocess_error "$logfile" "$errorfile" "JSON export" "$export_output"
+        _log_postprocess_error "$logfile" "$errorfile" "JSONL export" "$export_output"
         return 1
     fi
 
-    # Success - remove raw log file
-    rm -f "$logfile"
+    # Success - archive raw log file
+    local app=$(basename "$(dirname "$logfile")")
+    local raw_dir="$AI_LOG_DIR/$app/raw"
+    mkdir -p "$raw_dir"
+    mv "$logfile" "$raw_dir/"
     echo "Log processed: $cleanfile"
 }
 
@@ -226,12 +232,65 @@ ai_clean() {
     fi
 }
 
-# Export a log file to clean text or JSON using terminal emulation
-# Usage: ai_export <logfile> [--json] [-o output_file]
+# Export a log file to clean text, JSON, or JSONL using terminal emulation
+# Usage: ai_export <logfile> [--json|--jsonl] [-o output_file]
 # Requires: pip install pyte
 ai_export() {
     local script_dir="${0:A:h}"
     python3 "$script_dir/ai_export.py" "$@"
+}
+
+# List sessions from the session index
+# Usage: ai_sessions [app]        # List recent sessions
+#        ai_sessions -a           # List all apps
+ai_sessions() {
+    local script_dir="${0:A:h}"
+    local app="${1:-}"
+
+    if [[ "$app" == "-a" || "$app" == "--all" ]]; then
+        # List all apps
+        for a in ollama gemini claude; do
+            if [[ -f "$AI_LOG_DIR/$a/sessions-index.json" ]]; then
+                echo "=== $a ==="
+                python3 "$script_dir/session_index.py" "$a" --recent 5
+                echo ""
+            fi
+        done
+    elif [[ -n "$app" ]]; then
+        python3 "$script_dir/session_index.py" "$app" --recent 10
+    else
+        echo "Usage: ai_sessions <app>    # List recent sessions"
+        echo "       ai_sessions -a       # List all apps"
+        echo "Apps: ollama, gemini"
+    fi
+}
+
+# Show session index statistics
+# Usage: ai_stats [app]
+ai_stats() {
+    local script_dir="${0:A:h}"
+    local app="${1:-}"
+
+    if [[ -n "$app" ]]; then
+        python3 "$script_dir/session_index.py" "$app" --stats
+    else
+        for a in ollama gemini claude; do
+            if [[ -f "$AI_LOG_DIR/$a/sessions-index.json" ]]; then
+                echo "=== $a ==="
+                python3 "$script_dir/session_index.py" "$a" --stats
+                echo ""
+            fi
+        done
+    fi
+}
+
+# Migrate legacy sessions to JSONL format
+# Usage: ai_migrate [app]         # Migrate specific app
+#        ai_migrate --all         # Migrate all apps
+#        ai_migrate --status      # Show migration status
+ai_migrate() {
+    local script_dir="${0:A:h}"
+    python3 "$script_dir/migrate_sessions.py" "$@"
 }
 
 # List sessions by tag or show all tags

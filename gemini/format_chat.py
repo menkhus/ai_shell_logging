@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Mark Menkhus <mark.menkhus@gmail.com>
+# SPDX-License-Identifier: MIT
+
 import re
 
 def format_gemini_chat(chat_content):

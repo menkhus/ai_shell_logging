@@ -1,4 +1,7 @@
 #!/bin/bash
+# Copyright (c) 2026 Mark Menkhus <mark.menkhus@gmail.com>
+# SPDX-License-Identifier: MIT
+#
 # analyze_with_ollama.sh - Analyze prompt patterns using local LLM
 #
 # Uses your local ollama instance to critique your prompting patterns

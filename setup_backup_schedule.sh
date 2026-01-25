@@ -1,4 +1,7 @@
 #!/bin/bash
+# Copyright (c) 2026 Mark Menkhus <mark.menkhus@gmail.com>
+# SPDX-License-Identifier: MIT
+#
 # setup_backup_schedule.sh - Set up weekly automated backup of AI logs
 #
 # Creates a macOS Launch Agent to run backup_logs.sh weekly.

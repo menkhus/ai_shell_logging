@@ -1,4 +1,7 @@
 #!/bin/bash
+# Copyright (c) 2026 Mark Menkhus <mark.menkhus@gmail.com>
+# SPDX-License-Identifier: MIT
+#
 # prompt_clinic.sh - Pre-process prompts before sending to Claude
 #
 # Analyzes prompts for directiveness, scope, and actionability.

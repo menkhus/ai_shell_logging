@@ -5,7 +5,7 @@ This document tracks work to make this project usable by others.
 ## Critical Issues
 
 ### 1. No LICENSE
-- [x] Add MIT LICENSE file
+- [x] Add MIT LICENSE file (Mark Menkhus <mark.menkhus@gmail.com>)
 - Impact: People can't legally use/fork without explicit license
 
 ### 2. No requirements.txt
@@ -15,6 +15,11 @@ This document tracks work to make this project usable by others.
 ### 3. No .gitignore
 - [x] Add .gitignore for `__pycache__/`, `*.pyc`, `.DS_Store`
 - Impact: Noise in repo, accidental commits
+
+### 3b. No copyright headers in source files
+- [x] Add MIT copyright + SPDX headers to all 24 source files
+- Format: `# Copyright (c) 2026 Mark Menkhus <mark.menkhus@gmail.com>`
+- Format: `# SPDX-License-Identifier: MIT`
 
 ### 4. Hardcoded paths (15 files affected)
 - [ ] Make `AI_LOG_DIR` configurable in ai_logging.zsh
@@ -37,9 +42,9 @@ This document tracks work to make this project usable by others.
   - `README.md`
 
 ### 5. No configuration system
-- [ ] Define `AI_LOG_DIR` environment variable convention
+- [x] Define `AI_LOG_DIR` environment variable convention (already in ai_logging.zsh)
 - [ ] Document in README.md
-- [ ] Default to `~/ai_shell_logs` if unset
+- [x] Default to `~/ai_shell_logs` if unset (already implemented)
 
 ## Structural Improvements
 
@@ -87,3 +92,4 @@ This document tracks work to make this project usable by others.
 | Date | Item | Status |
 |------|------|--------|
 | 2026-01-25 | LICENSE, requirements.txt, .gitignore | Done |
+| 2026-01-25 | MIT copyright headers on all 24 source files | Done |

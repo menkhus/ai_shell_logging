@@ -1,14 +1,5 @@
 # AI Shell Logging - TODO
 
-## Completed (2026-01-25)
-
-- [x] JSONL format migration (Claude-compatible)
-- [x] Deterministic UUIDs for idempotent reprocessing
-- [x] Session index with querying
-- [x] Enhanced breadcrumb capture (git, timing, cwd, files)
-- [x] Migration of all legacy sessions
-- [x] Documentation update (README)
-
 ## Future Enhancements
 
 ### Session Recall
